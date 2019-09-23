@@ -1,194 +1,226 @@
 <template>
-  <div class="upload">
-    <!-- Camera -->
-    <div class="upload-logo-container">
-      <img src="../assets/triangirls-logo-full.png" class="upload-logo" />
+    <div class="upload">
+        <!-- Camera -->
+        <div class="upload-logo-container">
+            <img src="../assets/triangirls-logo-full.png" class="upload-logo"/>
+        </div>
+        <img src="../assets/triangirls-one.png" class="upload-bg--balloons"/>
+        <img src="../assets/triangirls-one.png" class="upload-bg--one"/>
+
+        <main id="camera">
+            <div id="camera-canvas"></div>
+            <img :src="frameSrc(picturesTaken)" class="upload-frame" alt="upload-frame"/>
+
+            <div v-if="status === 'uploading'">
+                <countdown :end-time="new Date().getTime() + 3000" @finish="uploadPhoto">
+                    <p slot="process" slot-scope="time">{{ `Get ready! Photo in: ${time.timeObj.ceil.s}` }}</p>
+                    <p slot="finish">Uploading...</p>
+                </countdown>
+            </div>
+
+            <p v-if="status === 'ready'">Press any key to upload photo</p>
+            <p v-if="status === 'success'">Photo uploaded</p>
+            <p v-if="status === 'failure'">Photo upload failed. Please try again</p>
+        </main>
+        <div class="upload-logo-container">
+            <img src="../assets/pusher.png" id="pusher" class="upload-logo--small"/>
+        </div>
     </div>
-    <img src="../assets/triangirls-one.png" class="upload-bg--balloons" />
-    <img src="../assets/triangirls-one.png" class="upload-bg--one" />
-
-    <main id="camera">
-      <div id="camera-canvas"></div>
-      <img :src="frameSrc(picturesTaken)" class="upload-frame" alt="upload-frame" />
-
-      <div v-if="status === 'uploading'">
-        <countdown :end-time="new Date().getTime() + 3000" @finish="uploadPhoto">
-          <p slot="process" slot-scope="time">{{ `Get ready! Photo in: ${time.timeObj.ceil.s}` }}</p>
-          <p slot="finish">Uploading...</p>
-        </countdown>
-      </div>
-
-      <p v-if="status === 'ready'">Press any key to upload photo</p>
-      <p v-if="status === 'success'">Photo uploaded</p>
-      <p v-if="status === 'failure'">Photo upload failed. Please try again</p>
-    </main>
-    <div class="upload-logo-container">
-      <img src="../assets/pusher.png" id="pusher" class="upload-logo--small" />
-    </div>
-  </div>
 </template>
 
 <script>
-/* eslint-disable */
-import axios from "axios";
-import P5 from "p5";
-import "p5/lib/addons/p5.dom";
+    import axios from 'axios';
+    import P5 from 'p5';
+    import "p5/lib/addons/p5.dom";
+    import Pusher from 'pusher-js';
 
-export default {
-  name: "Uploader",
+    const baseUrl = "https://or2ba7te07.execute-api.eu-west-2.amazonaws.com/dev";
 
-  data() {
-    return {
-      status: "ready",
-      picturesTaken: 0
-    };
-  },
-
-  created() {
-    // Set up P5, which handles the canvas/capture
-    new P5(p => {
-      let canvas, capture;
-      Object.assign(p, {
-        setup() {
-          canvas = p.createCanvas(800, 600);
-          capture = p.createCapture(p.VIDEO);
-          capture.size(500, 500);
-          capture.hide();
-          canvas.parent("#camera-canvas");
-
-          p.background(255, 0, 200);
-        },
-        draw() {
-          p.background(0);
-          p.image(capture, 0, 0, p.width, p.height);
+    const keydownHandler = function () {
+        if (this.status !== 'ready') {
+            return;
         }
-      });
-    }, "camera-canvas");
-    // Starts the countdown timer on keydown
-    window.addEventListener("keydown", () => {
-      if (this.status !== "ready") {
-        return;
-      }
 
-      this.status = "uploading";
-    });
-  },
+        this.status = 'uploading';
+    };
 
-  methods: {
-    async uploadPhoto() {
-      const c = document.querySelectorAll("canvas")[0];
-      const d = c.toDataURL("image/png");
-      const b = await fetch(d).then(r => r.blob());
-      this.fileChangedHandler(b);
-    },
-    fileChangedHandler(blob) {
-      const formData = new FormData();
+    export default {
+        name: 'Uploader',
 
-      formData.append("image", blob, new Date().toString());
+        data() {
+            return {
+                status: "ready",
+                galleryImages: [],
+                picturesTaken: 0
+            }
+        },
 
-      axios
-        .post("http://localhost:5000/upload", formData)
-        .then(() => (this.status = "success"))
-        .catch(() => (this.status = "failure"))
-        .finally(() =>
-          setTimeout(() => {
-            this.status = "ready";
-            this.picturesTaken++;
-          }, 2000)
-        );
-    },
-    frameSrc(picturesTaken) {
-      const frameIndex = (picturesTaken % 4) + 1;
-      return require(`../assets/frame-${frameIndex}.png`);
-    }
-  }
-};
+        computed: {
+            displayGalleryImages: function () {
+                return this.galleryImages.slice(0, 3);
+            }
+        },
+
+        async mounted() {
+
+            // Set up P5, which handles the canvas/capture
+            new P5((p) => {
+                let canvas, capture;
+                Object.assign(p, {
+                    setup() {
+                        canvas = p.createCanvas(800, 600);
+                        capture = p.createCapture(p.VIDEO);
+                        capture.size(500, 500);
+                        capture.hide();
+                        canvas.parent("#camera-canvas");
+
+                        p.background(255, 0, 200);
+                    },
+                    draw() {
+                        p.background(0);
+                        p.image(capture, 0, 0, p.width, p.height);
+                    }
+                });
+            }, 'camera-canvas');
+
+            // Starts the countdown timer on keydown
+
+            window.addEventListener('keydown', keydownHandler.bind(this));
+
+            // Pusher subscription
+
+            const pusher = new Pusher("a3e66f033b1c7a3c239d", {
+                cluster: "eu",
+                encrypted: true
+            });
+
+            const channel = pusher.subscribe("gallery");
+
+            channel.bind("upload", ({image}) => {
+                this.galleryImages = [image, ...this.galleryImages];
+            });
+
+            // Requests last images
+
+            const {data} = await axios.get(`${baseUrl}/list`);
+
+            this.galleryImages = data;
+
+        },
+
+        unmounted() {
+            window.removeEventListener('keydown', keydownHandler.bind(this));
+        },
+
+        methods: {
+            async uploadPhoto() {
+                const c = document.querySelectorAll("canvas")[0];
+                this.fileChangedHandler(c.toDataURL("image/png"));
+            },
+            fileChangedHandler(base64Image) {
+                axios.post(`${baseUrl}/push`, {
+                    image: base64Image,
+                    frame: this.picturesTaken % 4
+                })
+                    .then(() => this.status = 'success')
+                    .catch(() => this.status = 'failure')
+                    .finally(() => setTimeout(() => {
+                        this.status = 'ready';
+                        this.picturesTaken++;
+                    }, 2000));
+            },
+            frameSrc(picturesTaken) {
+                const frameIndex = (picturesTaken % 4) + 1;
+                return require(`../assets/frame-${frameIndex}.png`);
+            }
+        }
+    };
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
-#camera {
-  width: 800px;
-  height: 600px;
-  display: inline-block;
-  position: relative;
-  margin-top: -3rem;
-}
+    #camera {
+        width: 800px;
+        height: 600px;
+        display: inline-block;
+        position: relative;
+        margin-top: -3rem;
+    }
 
-.upload {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  align-items: center;
-  height: 100vh;
-}
+    .upload {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        align-items: center;
+        height: 100vh;
+    }
 
-.upload-frame {
-  z-index: 10;
-  position: absolute;
-  border: 4px solid #0b48d8;
-  left: 0;
-  top: 0;
-  width: 796px;
-  height: 596px;
-}
+    .upload-frame {
+        z-index: 10;
+        position: absolute;
+        border: 4px solid #0b48d8;
+        left: 0;
+        top: 0;
+        width: 796px;
+        height: 596px;
+    }
 
-.upload-logo-container {
-  display: flex;
-  justify-content: center;
-}
+    .upload-logo-container {
+        display: flex;
+        justify-content: center;
+    }
 
-.upload-logo {
-  width: 30%;
-}
+    .upload-logo {
+        width: 30%;
+    }
 
-.upload-logo--small {
-  width: 10%;
-}
+    .upload-logo--small {
+        width: 10%;
+    }
 
-.upload-bg--balloons {
-  position: absolute;
-  z-index: 1;
-  width: 30%;
-  top: 3vh;
-  right: -13vw;
-}
+    .upload-bg--balloons {
+        position: absolute;
+        z-index: 1;
+        width: 30%;
+        top: 3vh;
+        right: -13vw;
+    }
 
-.upload-bg--one {
-  position: absolute;
-  z-index: 1;
-  width: 40%;
-  left: 3vw;
-  bottom: -10%;
-}
+    .upload-bg--one {
+        position: absolute;
+        z-index: 1;
+        width: 40%;
+        left: 3vw;
+        bottom: -10%;
+    }
 
-@media only screen and (min-width: 1300px) {
-  .upload-bg--one {
-    bottom: -30%;
-  }
-}
+    @media only screen and (min-width: 1300px) {
+        .upload-bg--one {
+            bottom: -30%;
+        }
+    }
 
-h3 {
-  margin: 40px 0 0;
-}
+    h3 {
+        margin: 40px 0 0;
+    }
 
-ul {
-  list-style-type: none;
-  padding: 0;
-}
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
 
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
+    li {
+        display: inline-block;
+        margin: 0 10px;
+    }
 
-a {
-  color: #42b983;
-}
+    a {
+        color: #42b983;
+    }
 
-p {
-  font-weight: 700;
-  color: #0b48d8;
-  font-size: 30px;
-}
+    p {
+        font-weight: 700;
+        color: #0b48d8;
+        font-size: 30px;
+    }
 </style>
