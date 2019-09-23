@@ -22,6 +22,7 @@
             <p v-if="status === 'success'">Photo uploaded</p>
             <p v-if="status === 'failure'">Photo upload failed. Please try again</p>
         </main>
+
         <div class="upload-logo-container">
             <img src="../assets/pusher.png" id="pusher" class="upload-logo--small"/>
         </div>
@@ -32,9 +33,7 @@
     import axios from 'axios';
     import P5 from 'p5';
     import "p5/lib/addons/p5.dom";
-    import Pusher from 'pusher-js';
 
-    const baseUrl = "https://or2ba7te07.execute-api.eu-west-2.amazonaws.com/dev";
 
     const keydownHandler = function () {
         if (this.status !== 'ready') {
@@ -47,17 +46,12 @@
     export default {
         name: 'Uploader',
 
+        props: ['baseUrl'],
+
         data() {
             return {
                 status: "ready",
-                galleryImages: [],
                 picturesTaken: 0
-            }
-        },
-
-        computed: {
-            displayGalleryImages: function () {
-                return this.galleryImages.slice(0, 3);
             }
         },
 
@@ -87,25 +81,6 @@
 
             window.addEventListener('keydown', keydownHandler.bind(this));
 
-            // Pusher subscription
-
-            const pusher = new Pusher("a3e66f033b1c7a3c239d", {
-                cluster: "eu",
-                encrypted: true
-            });
-
-            const channel = pusher.subscribe("gallery");
-
-            channel.bind("upload", ({image}) => {
-                this.galleryImages = [image, ...this.galleryImages];
-            });
-
-            // Requests last images
-
-            const {data} = await axios.get(`${baseUrl}/list`);
-
-            this.galleryImages = data;
-
         },
 
         unmounted() {
@@ -118,7 +93,7 @@
                 this.fileChangedHandler(c.toDataURL("image/png"));
             },
             fileChangedHandler(base64Image) {
-                axios.post(`${baseUrl}/push`, {
+                axios.post(`${this.baseUrl}/push`, {
                     image: base64Image,
                     frame: this.picturesTaken % 4
                 })
@@ -139,6 +114,15 @@
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
+    ul.gallery li {
+        position: relative;
+    }
+
+    ul.gallery li img {
+        width: 200px;
+        height: 150px;
+    }
+
     #camera {
         width: 800px;
         height: 600px;
@@ -200,27 +184,4 @@
         }
     }
 
-    h3 {
-        margin: 40px 0 0;
-    }
-
-    ul {
-        list-style-type: none;
-        padding: 0;
-    }
-
-    li {
-        display: inline-block;
-        margin: 0 10px;
-    }
-
-    a {
-        color: #42b983;
-    }
-
-    p {
-        font-weight: 700;
-        color: #0b48d8;
-        font-size: 30px;
-    }
 </style>

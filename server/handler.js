@@ -1,5 +1,6 @@
 'use strict';
 
+const util = require('util');
 const Pusher = require('pusher');
 const cloudinary = require('cloudinary');
 const AWS = require('aws-sdk');
@@ -41,7 +42,7 @@ module.exports.getImages = async () => {
             Limit: 10
         };
 
-        const { Items } = await dynamoDb.query(dynamoDbQueryParams).promise();
+        const {Items} = await dynamoDb.query(dynamoDbQueryParams).promise();
 
         return {
             statusCode: 200,
@@ -75,8 +76,14 @@ module.exports.addImage = async (event) => {
 
         await dynamoDb.put(dynamoDbPutParams).promise();
 
-        pusher.trigger('gallery', 'upload', {
-            image: item,
+        await new Promise((resolve, reject) => {
+            pusher.trigger('gallery', 'upload', {image: item}, (error, res) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve(res);
+                }
+            });
         });
 
         return {
