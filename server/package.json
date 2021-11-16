@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aws-sdk": "^2.533.0",
+    "aws-sdk": "^2.814.0",
     "cloudinary": "^1.15.0",
     "moment": "^2.24.0",
     "pusher": "^2.2.2"
