@@ -14,13 +14,13 @@
     "p5": "^0.9.0",
     "pusher-js": "^5.0.1",
     "vue": "^2.6.10",
-    "vue-awesome-countdown": "^1.0.16"
+    "vue-awesome-countdown": "^1.1.4"
   },
   "devDependencies": {
     "@vue/cli": "^3.11.0",
     "@vue/cli-plugin-babel": "^3.11.0",
     "@vue/cli-plugin-eslint": "^3.11.0",
-    "@vue/cli-service": "^3.11.0",
+    "@vue/cli-service": "^5.0.8",
     "babel-eslint": "^10.0.1",
     "eslint": "^5.16.0",
     "eslint-plugin-vue": "^5.0.0",
